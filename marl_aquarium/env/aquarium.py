@@ -317,7 +317,6 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
 
     def close(self):
         pygame.quit()  # pylint: disable=no-member
-        sys.exit()
 
     def create_random_prey(self):
         """Creates a prey with a random position and velocity"""
