@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="marl-aquarium",
-    version="0.1.10",
+    version="0.1.12",
     packages=find_packages(exclude=["examples"]),
     license="MIT",
     description="Aquarium: A Comprehensive Framework for Exploring Predator-Prey Dynamics through Multi-Agent Reinforcement Learning Algorithms",
@@ -28,7 +28,7 @@ setup(
     ],
     python_requires=">=3.8",
     install_requires=[
-        "gymnasium==0.28.1",
+        "gymnasium>=0.28.1",
         "moviepy==1.0.3",
         "numpy==1.22.4",
         "pettingzoo==1.24.2",
