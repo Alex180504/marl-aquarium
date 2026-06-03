@@ -854,26 +854,25 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
     def predator_nearby_shark_observations(self, observer: Entity) -> Sequence[float]:
         """Get the observations of the current state of the environment of an observer."""
         observations = []
+        max_observations = self.predator_observe_count * self.obs_size
         if self.fov_enabled:
             for shark in self.predators:
                 if (
                     self.torus.check_if_entity_is_in_view_in_torus(
-                        observer, shark, self.prey_view_distance, self.prey_fov
+                        observer, shark, self.predator_view_distance, self.predator_fov
                     )
-                    and len(observations) < self.predator_observe_count * self.obs_size
+                    and len(observations) < max_observations
                 ):
                     observation = self.nearby_animal_observation(observer, shark)
                     observations += observation
-        # print(f'Sharks : {len(all_sharks)}')
-        for shark in self.predators:
-            if shark is not observer:
-                observation = self.nearby_animal_observation(observer, shark)
-                observations += observation
+        else:
+            for shark in self.predators:
+                if shark is not observer and len(observations) < max_observations:
+                    observation = self.nearby_animal_observation(observer, shark)
+                    observations += observation
 
-        # print(f'Shark observations: {len(observations)}')
-
-        if len(observations) < self.predator_observe_count * self.obs_size:
-            observations += [0] * (self.predator_observe_count * self.obs_size - len(observations))
+        if len(observations) < max_observations:
+            observations += [0] * (max_observations - len(observations))
 
         return observations
 
@@ -894,23 +893,25 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
     def predator_nearby_fish_observations(self, observer: Entity) -> Sequence[float]:
         """Get the observations of the current state of the environment of an observer."""
         observations = []
+        max_observations = self.prey_observe_count * self.obs_size
         if self.fov_enabled:
             for fish in self.prey:
-                if self.torus.check_if_entity_is_in_view_in_torus(
-                    observer, fish, self.prey_view_distance, self.prey_fov
+                if (
+                    self.torus.check_if_entity_is_in_view_in_torus(
+                        observer, fish, self.predator_view_distance, self.predator_fov
+                    )
+                    and len(observations) < max_observations
                 ):
                     observation = self.nearby_animal_observation(observer, fish)
                     observations += observation
         else:
             closest_fish = self.predator_get_n_closest_fish(observer)
             for fish in closest_fish:
-                if fish is not observer:
+                if fish is not observer and len(observations) < max_observations:
                     observation = self.nearby_animal_observation(observer, fish)
                     observations += observation
-        # print(f'Fish Num diff: {fish_num - len(all_fishes)}')
-        if len(observations) < self.prey_observe_count * self.obs_size:
-            observations += [0] * (self.prey_observe_count * self.obs_size - len(observations))
-        # print(f'Fish observations: {len(observations)}')
+        if len(observations) < max_observations:
+            observations += [0] * (max_observations - len(observations))
         return observations
 
     def get_predator_observations(self, observer: Entity):
