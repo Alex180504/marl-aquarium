@@ -29,10 +29,10 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "gymnasium>=0.28.1",
-        "moviepy==1.0.3",
-        "numpy==1.22.4",
-        "pettingzoo==1.24.2",
-        "pygame==2.1.3",
+        "moviepy>=1.0.3",
+        "numpy>=1.22.4",
+        "pettingzoo>=1.24.2",
+        "pygame>=2.1.3",
     ],
     include_package_data=True,
 )
