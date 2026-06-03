@@ -89,6 +89,10 @@ class View:
         fps_string = self.font.render(str(int(fps)), True, pygame.Color("black"))
         self.screen.blit(fps_string, (1, 1))
 
+    def draw_walls(self, color: Tuple[int, int, int] = (50, 50, 50), thickness: int = 4):
+        """Draws four border walls at the edges of the environment."""
+        pygame.draw.rect(self.screen, color, (0, 0, self.width, self.height), thickness)
+
     def draw_circle_at_position(
         self, position: Vector, color: Tuple[int, int, int, int], size: float
     ):

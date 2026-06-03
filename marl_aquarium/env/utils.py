@@ -17,15 +17,23 @@ from marl_aquarium.env.vector import Vector
 class Torus:
     """A class representing a torus environment"""
 
-    def __init__(self, width: int, height: int) -> None:
+    def __init__(self, width: int, height: int, wrap: bool = True) -> None:
         self.width = width
         self.height = height
+        self.wrap = wrap
 
     def get_distance_in_torus(self, position1: Vector, position2: Vector):
         """Returns the distance between two positions in a torus environment"""
-        dist_x = min(abs(position1.x - position2.x), self.width - abs(position1.x - position2.x))
-        dist_y = min(abs(position1.y - position2.y), self.height - abs(position1.y - position2.y))
-
+        if self.wrap:
+            dist_x = min(
+                abs(position1.x - position2.x), self.width - abs(position1.x - position2.x)
+            )
+            dist_y = min(
+                abs(position1.y - position2.y), self.height - abs(position1.y - position2.y)
+            )
+        else:
+            dist_x = abs(position1.x - position2.x)
+            dist_y = abs(position1.y - position2.y)
         return math.sqrt(dist_x**2 + dist_y**2)
 
     def collision(self, animal1: Entity, animal2: Entity):
@@ -45,10 +53,13 @@ class Torus:
     def get_directional_vector_to_animal_in_torus(self, animal: Entity, destination: Vector):
         """Returns a directional vector to the destination in a torus environment"""
         dx, dy = destination.x - animal.position.x, destination.y - animal.position.y
-        directional_vector = Vector(
-            dx - self.width if abs(dx) > self.width / 2 else dx,
-            dy - self.height if abs(dy) > self.height / 2 else dy,
-        )
+        if self.wrap:
+            directional_vector = Vector(
+                dx - self.width if abs(dx) > self.width / 2 else dx,
+                dy - self.height if abs(dy) > self.height / 2 else dy,
+            )
+        else:
+            directional_vector = Vector(dx, dy)
         return directional_vector
 
     def get_nearest_entity_coordinates(self, animal: Entity, animals: Collection[Entity]):
@@ -72,7 +83,7 @@ class Torus:
         acceleration_vector = position2.copy()
         distance = self.get_distance_in_torus(position1, position2)
         acceleration_vector.sub(position1)
-        if distance > self.width / 2:
+        if self.wrap and distance > self.width / 2:
             acceleration_vector.negate()
 
         direction = get_angle_from_vector(acceleration_vector)
@@ -109,6 +120,10 @@ class Torus:
     ) -> bool:
         """Returns True if the animal is in the view cone of the observer, False otherwise"""
         view_cone_direction = scale(observer.orientation_angle, -180, 180, 0, 360)
+        if not self.wrap:
+            return self.check_if_animal_is_in_view_cone(
+                observer.position, view_cone_direction, animal, view_distance, fov
+            )
         is_in_view = False
         # TODO: Create a function for offsetting positions
         # We check 8 other view cones around the original view cone,
@@ -154,6 +169,8 @@ class Torus:
     def position_offset(self, animal: Entity, function: Any, *args: Any):
         """Calls the given function with the animal's position and the given arguments
         for all positions that are offset by the width or height of the torus"""
+        if not self.wrap:
+            return
         offsets = []
         if animal.position.x < self.width / 2 and animal.position.y < self.height / 2:
             offsets = [

@@ -35,7 +35,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
     def __init__(
         self,
         render_mode: str = "human",
-        observable_walls: int = 2,
+        observable_walls: bool = False,
         width: int = 800,
         height: int = 800,
         caption: str = "Aquarium",
@@ -53,6 +53,8 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         draw_death_circles: bool = False,
         fov_enabled: bool = True,
         keep_prey_count_constant: bool = True,
+        wall_avoidance_distance: int = 100,
+        wall_avoidance_force: float = 1.0,
         prey_radius: int = 20,
         prey_max_acceleration: float = 1,
         prey_max_velocity: float = 4,
@@ -107,6 +109,8 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         self.predator_reward = predator_reward
         self.catch_radius = catch_radius
         self.procreate = procreate
+        self.wall_avoidance_distance = wall_avoidance_distance
+        self.wall_avoidance_force = wall_avoidance_force
 
         # DEBUG
         self.draw_force_vectors = draw_force_vectors
@@ -125,21 +129,24 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         self.all_entities = self.prey + self.predators
         self.current_prey_count = len(self.prey)
 
-        self.observable_walls = observable_walls
+        self.observable_walls = bool(observable_walls)
         self.dead_animals = {}
         self.death_positions = []
         self.possible_agents = ["predator_" + str(r) for r in range(self.predator_count)] + [
             "prey_" + str(i) for i in range(self.prey_count)
         ]
         self.obs_size = 6
+        _wall_features = 4 if self.observable_walls else 0
         self.number_of_fish_observations = (
             5
+            + _wall_features
             + self.predator_observe_count * self.obs_size
             + (self.prey_observe_count) * self.obs_size
         )
 
         self.number_of_predator_observations = (
             5
+            + _wall_features
             + self.prey_observe_count * self.obs_size
             + (self.predator_observe_count) * self.obs_size
         )
@@ -151,7 +158,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         self.past_shark_positions = None
         self.catches_this_step = []
 
-        self.torus = Torus(self.width, self.height)
+        self.torus = Torus(self.width, self.height, wrap=not self.observable_walls)
         self.view = None
 
     def reset(
@@ -263,6 +270,9 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
             self.view = View(self.width, self.height, self.caption, self.fps)
 
         self.view.draw_background()
+
+        if self.observable_walls:
+            self.view.draw_walls()
 
         screenshot_number = 1
         for event in pygame.event.get():
@@ -379,15 +389,27 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         return Discrete(self.action_count)
 
     def check_borders(self, animal: Entity):
-        """Checks if the animal is outside the borders of the aquarium and moves it to the other side if it is"""
-        if animal.position.x > self.width:
-            animal.position.x = 0
-        elif animal.position.x < 0:
-            animal.position.x = self.width
-        if animal.position.y > self.height:
-            animal.position.y = 0
-        elif animal.position.y < 0:
-            animal.position.y = self.height
+        """Check and enforce boundary conditions on the animal's position."""
+        if self.observable_walls:
+            # Rectangle topology: clamp to edges, keep velocity (slide along wall)
+            if animal.position.x > self.width:
+                animal.position.x = self.width
+            elif animal.position.x < 0:
+                animal.position.x = 0
+            if animal.position.y > self.height:
+                animal.position.y = self.height
+            elif animal.position.y < 0:
+                animal.position.y = 0
+        else:
+            # Torus topology: wrap around edges
+            if animal.position.x > self.width:
+                animal.position.x = 0
+            elif animal.position.x < 0:
+                animal.position.x = self.width
+            if animal.position.y > self.height:
+                animal.position.y = 0
+            elif animal.position.y < 0:
+                animal.position.y = self.height
 
     @staticmethod
     def spawn_new_prey(parent_prey: Prey):
@@ -409,9 +431,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         prey.recently_died = False
         if self.torus.get_colliding_animal(prey, predators) is not None:
             # Record catch regardless of keep_prey_count_constant for reward signal
-            self.catches_this_step.append(
-                {"killed": prey.id(), "position": prey.position.copy()}
-            )
+            self.catches_this_step.append({"killed": prey.id(), "position": prey.position.copy()})
             if self.keep_prey_count_constant:
                 prey.death_count += 1
                 prey.recently_died = True
@@ -426,6 +446,9 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         steer_force.limit(self.prey_max_steer_force)
 
         prey.apply_force(steer_force)
+
+        wall_force = self.get_wall_repulsion_force(prey)
+        prey.apply_force(wall_force)
 
         prey.acceleration.normalize()
         prey.acceleration.mult(self.prey_max_acceleration)
@@ -468,6 +491,8 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         steer_force.limit(self.predator_max_steer_force)
 
         predator.apply_force(steer_force)
+        wall_force = self.get_wall_repulsion_force(predator)
+        predator.apply_force(wall_force)
         predator.acceleration.normalize()
         predator.acceleration.mult(self.predator_max_acceleration)
 
@@ -659,6 +684,50 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         #     total_reward = -200
         return total_reward
 
+    def wall_observation(
+        self, observer: Entity, obs_min: float = 0, obs_max: float = 1
+    ) -> List[float]:
+        """Returns 4 wall-distance features: [left, right, top, bottom],
+        each clamped to view_distance and scaled to [obs_min, obs_max]."""
+        if not self.observable_walls:
+            return []
+        left_dist = observer.position.x
+        right_dist = self.width - observer.position.x
+        top_dist = observer.position.y
+        bottom_dist = self.height - observer.position.y
+        max_dist = observer.view_distance
+        return [
+            scale(min(left_dist, max_dist), 0, max_dist, obs_min, obs_max),
+            scale(min(right_dist, max_dist), 0, max_dist, obs_min, obs_max),
+            scale(min(top_dist, max_dist), 0, max_dist, obs_min, obs_max),
+            scale(min(bottom_dist, max_dist), 0, max_dist, obs_min, obs_max),
+        ]
+
+    def get_wall_repulsion_force(self, entity: Entity) -> "Vector":
+        """Returns a repulsive steering force away from nearby walls.
+        Uses self.wall_avoidance_distance and self.wall_avoidance_force."""
+        if not self.observable_walls:
+            return Vector(0, 0)
+        force = Vector(0, 0)
+        threshold = self.wall_avoidance_distance
+        # Left wall
+        if entity.position.x < threshold:
+            force.x += self.wall_avoidance_force * (1 - entity.position.x / threshold)
+        # Right wall
+        if entity.position.x > self.width - threshold:
+            force.x -= self.wall_avoidance_force * (
+                1 - (self.width - entity.position.x) / threshold
+            )
+        # Top wall
+        if entity.position.y < threshold:
+            force.y += self.wall_avoidance_force * (1 - entity.position.y / threshold)
+        # Bottom wall
+        if entity.position.y > self.height - threshold:
+            force.y -= self.wall_avoidance_force * (
+                1 - (self.height - entity.position.y) / threshold
+            )
+        return force
+
     def prey_observer_observation(
         self, observer: Entity, obs_min: float = 0, obs_max: float = 1
     ) -> List[float]:
@@ -671,6 +740,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         scaled_direction = scale(direction, -180, 180, obs_min, obs_max)
         scaled_speed = scale(speed, 0, observer.max_speed, obs_min, obs_max)
         observation = [1, scaled_position_x, scaled_position_y, scaled_direction, scaled_speed]
+        observation += self.wall_observation(observer, obs_min, obs_max)
         # print(f'Observer_observation: {len(observation)}')
 
         assert all(
@@ -845,6 +915,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         scaled_direction = scale(direction, -180, 180, obs_min, obs_max)
         scaled_speed = scale(speed, 0, observer.max_speed, obs_min, obs_max)
         observation = [0, scaled_position_x, scaled_position_y, scaled_direction, scaled_speed]
+        observation += self.wall_observation(observer, obs_min, obs_max)
 
         assert all(
             obs_min <= value <= obs_max for value in observation
