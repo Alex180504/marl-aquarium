@@ -39,7 +39,7 @@ env.close()
 | Parameter                   | Description                                                                             | Default Value |
 | --------------------------- | --------------------------------------------------------------------------------------- | ------------- |
 | `render_mode`               | The mode of rendering. Options include "human" for on-screen rendering and "rgb_array". | `"human"`     |
-| `observable_walls`          | Number of observable walls for the agents.                                              | `2`           |
+| `observable_walls`          | Enable rectangle topology with physical walls (instead of torus wrapping). Adds 4 wall-distance features to observations and wall-avoidance steering. | `False`      |
 | `width`                     | The width of the environment window.                                                    | `800`         |
 | `height`                    | The height of the environment window.                                                   | `800`         |
 | `caption`                   | The caption of the environment window.                                                  | `"Aquarium"`  |
@@ -77,6 +77,22 @@ env.close()
 | `predator_reward`           | Reward for predator catching prey.                                                      | `10`          |
 | `catch_radius`              | Radius within which predators can catch prey.                                           | `100`         |
 | `procreate`                 | Whether entities can procreate within the environment.                                  | `False`       |
+| `wall_avoidance_distance`   | Distance from walls at which repulsive steering kicks in (only when `observable_walls=True`). | `100`     |
+| `wall_avoidance_force`      | Strength of the repulsive wall-avoidance steering force (only when `observable_walls=True`). | `1.0`     |
+
+## Topology
+
+By default the environment uses a **toroidal** (wrap-around) topology — entities crossing an edge reappear on the opposite side. Set `observable_walls=True` to switch to a **rectangle** topology with four physical walls:
+
+- Entities are clamped to the arena edges (slide along walls).
+- Distance, vision, and collision checks use straight-line (non-wrapping) metrics.
+- Four wall-proximity features are added to each agent's observation vector.
+- A repulsive steering force pushes agents away from nearby walls.
+
+```python
+# Rectangle topology with wall avoidance
+env = aquarium_v0.parallel_env(observable_walls=True, render_mode="human")
+```
 
 ```python
 env = aquarium_v0.env(

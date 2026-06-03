@@ -8,7 +8,7 @@ from marl_aquarium.env.aquarium import raw_env
 
 def env(
     render_mode: str = "human",
-    observable_walls: int = 2,
+    observable_walls: bool = False,
     width: int = 800,
     height: int = 800,
     caption: str = "Aquarium",
@@ -26,6 +26,8 @@ def env(
     draw_death_circles: bool = False,
     fov_enabled: bool = True,
     keep_prey_count_constant: bool = True,
+    wall_avoidance_distance: int = 100,
+    wall_avoidance_force: float = 1.0,
     prey_radius: int = 20,
     prey_max_acceleration: float = 1,
     prey_max_velocity: float = 4,
@@ -89,6 +91,8 @@ def env(
             predator_reward=predator_reward,
             catch_radius=catch_radius,
             procreate=procreate,
+            wall_avoidance_distance=wall_avoidance_distance,
+            wall_avoidance_force=wall_avoidance_force,
         )
     )
     env_aec = AssertOutOfBoundsWrapper(env_aec)
@@ -99,7 +103,7 @@ def env(
 
 def parallel_env(
     render_mode: str = "human",
-    observable_walls: int = 2,
+    observable_walls: bool = False,
     width: int = 800,
     height: int = 800,
     caption: str = "Aquarium",
@@ -117,6 +121,8 @@ def parallel_env(
     draw_death_circles: bool = False,
     fov_enabled: bool = True,
     keep_prey_count_constant: bool = True,
+    wall_avoidance_distance: int = 100,
+    wall_avoidance_force: float = 1.0,
     prey_radius: int = 20,
     prey_max_acceleration: float = 1,
     prey_max_velocity: float = 4,
@@ -180,5 +186,7 @@ def parallel_env(
             predator_reward=predator_reward,
             catch_radius=catch_radius,
             procreate=procreate,
+            wall_avoidance_distance=wall_avoidance_distance,
+            wall_avoidance_force=wall_avoidance_force,
         )
     )
