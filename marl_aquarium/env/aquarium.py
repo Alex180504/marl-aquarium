@@ -149,6 +149,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
 
         self.agents = copy.deepcopy(self.possible_agents)
         self.past_shark_positions = None
+        self.catches_this_step = []
 
         self.torus = Torus(self.width, self.height)
         self.view = None
@@ -173,7 +174,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         return np.array(self.get_obs())
 
     def step(self, actions: Dict[Any, Any]):
-        catches = []
+        self.catches_this_step = []
         for entity in self.all_entities:
             desired_velocity = self.get_desired_velocity_from_action(actions[entity.id()], entity)
             entity.age += 1
@@ -181,10 +182,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
             if isinstance(entity, Predator):
                 self.update_predator(entity, desired_velocity)
             else:
-                prey = self.update_prey(entity, self.predators, desired_velocity)
-                if not prey.alive:
-                    kill_event = {"killed": prey.id(), "position": prey.position}
-                    catches.append(kill_event)
+                self.update_prey(entity, self.predators, desired_velocity)
 
             # TODO: Move this to the render function
             if self.view and self.draw_action_vectors:
@@ -205,7 +203,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
 
         infos = {agent: {} for agent in self.agents}
 
-        rewards = self.get_rewards(catches)
+        rewards = self.get_rewards(self.catches_this_step)
         for dead_fish in dead_fishes:
             rewards[dead_fish] = 0
 
@@ -410,8 +408,11 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         """Updates the prey"""
         prey.recently_died = False
         if self.torus.get_colliding_animal(prey, predators) is not None:
+            # Record catch regardless of keep_prey_count_constant for reward signal
+            self.catches_this_step.append(
+                {"killed": prey.id(), "position": prey.position.copy()}
+            )
             if self.keep_prey_count_constant:
-                # TODO: Sharks now get no reward for eating fish
                 prey.death_count += 1
                 prey.recently_died = True
                 prey.position = Vector(
@@ -419,9 +420,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
                 )
             else:
                 prey.alive = False
-                # print(f'Fish {fish.id()} died')
                 self.current_prey_count -= 1
-                # print(self.number_of_fish)
         steer_force = desired_velocity.copy()
         steer_force.sub(prey.velocity)
         steer_force.limit(self.prey_max_steer_force)
