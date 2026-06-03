@@ -199,7 +199,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
                 )
 
         remaining_fish = [fish.id() for fish in self.prey]
-        fishes_in_agents = [agent for agent in self.agents if agent.startswith("fish")]
+        fishes_in_agents = [agent for agent in self.agents if agent.startswith("prey")]
         dead_fishes = list(set(fishes_in_agents) - set(remaining_fish))
         observations = self.get_obs()
 
