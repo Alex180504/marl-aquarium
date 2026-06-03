@@ -685,6 +685,8 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         """Get the observations of the current state of the environment of an observer."""
         position = animal.position
         distance = self.torus.get_distance_in_torus(observer.position, animal.position)
+        # Clamp distance to view_distance to keep scale() assertions safe
+        distance = min(distance, observer.view_distance)
         direction = self.torus.get_direction_in_torus(observer.position, animal.position)
         speed = animal.velocity.mag()
         scaled_position_x = scale(position.x, 0, self.width, obs_min, obs_max)
