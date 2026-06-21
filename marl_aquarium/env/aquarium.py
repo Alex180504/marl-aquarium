@@ -42,6 +42,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         fps: int = 60,
         max_time_steps: int = 3000,
         action_count: int = 16,
+        continuous_actions: bool = False,
         predator_count: int = 1,
         prey_count: int = 16,
         predator_observe_count: int = 1,
@@ -83,6 +84,7 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         self.fps = fps
         self.max_time_steps = max_time_steps
         self.action_count = action_count
+        self.continuous_actions = continuous_actions
         self.predator_count = predator_count
         self.prey_count = prey_count
         self.predator_observe_count = predator_observe_count
@@ -386,6 +388,8 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
 
     @functools.lru_cache(maxsize=None)  # type: ignore
     def action_space(self, agent: str):  # type: ignore
+        if self.continuous_actions:
+            return Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32)
         return Discrete(self.action_count)
 
     def check_borders(self, animal: Entity):
@@ -633,13 +637,18 @@ class raw_env(ParallelEnv[str, Box, Discrete | None]):  # pylint: disable=C0103
         for death_position in self.death_positions:
             self.view.draw_circle_at_position(death_position, color, 4)
 
-    def get_desired_velocity_from_action(self, action: int, animal: Entity):
+    def get_desired_velocity_from_action(self, action, animal: Entity):
         """Returns the desired velocity from the given action"""
         max_velocity = 0
         if isinstance(animal, Predator):
             max_velocity = self.predator_max_velocity
         elif isinstance(animal, Prey):
             max_velocity = self.prey_max_velocity
+        if self.continuous_actions:
+            desired_velocity = Vector(float(action[0]), float(action[1]))
+            desired_velocity.mult(max_velocity)
+            desired_velocity.limit(max_velocity)
+            return desired_velocity
         desired_velocity = get_vector_from_action(action, self.action_count)
         desired_velocity.normalize()
         desired_velocity.mult(max_velocity)

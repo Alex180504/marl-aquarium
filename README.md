@@ -39,13 +39,14 @@ env.close()
 | Parameter                   | Description                                                                             | Default Value |
 | --------------------------- | --------------------------------------------------------------------------------------- | ------------- |
 | `render_mode`               | The mode of rendering. Options include "human" for on-screen rendering and "rgb_array". | `"human"`     |
-| `observable_walls`          | Enable rectangle topology with physical walls (instead of torus wrapping). Adds 4 wall-distance features to observations and wall-avoidance steering. | `False`      |
+| `observable_walls`          | Rectangle topology: physical walls, 4 wall-distance features, wall-avoidance steering.  | `False`       |
 | `width`                     | The width of the environment window.                                                    | `800`         |
 | `height`                    | The height of the environment window.                                                   | `800`         |
 | `caption`                   | The caption of the environment window.                                                  | `"Aquarium"`  |
 | `fps`                       | Frames per second, controlling the speed of simulation.                                 | `60`          |
 | `max_time_steps`            | Maximum number of time steps per episode.                                               | `3000`        |
-| `action_count`              | Number of possible actions an agent can take.                                           | `16`          |
+| `action_count`              | Number of possible actions an agent can take. Ignored when `continuous_actions=True`.   | `16`          |
+| `continuous_actions`        | Continuous action space: 2D velocity `[x, y]` in `[-1, 1]`, scaled by `max_velocity`.   | `False`       |
 | `predator_count`            | Number of predators in the environment.                                                 | `1`           |
 | `prey_count`                | Number of prey in the environment.                                                      | `16`          |
 | `predator_observe_count`    | Number of predators that can be observed by an agent.                                   | `1`           |
@@ -77,8 +78,8 @@ env.close()
 | `predator_reward`           | Reward for predator catching prey.                                                      | `10`          |
 | `catch_radius`              | Radius within which predators can catch prey.                                           | `100`         |
 | `procreate`                 | Whether entities can procreate within the environment.                                  | `False`       |
-| `wall_avoidance_distance`   | Distance from walls at which repulsive steering kicks in (only when `observable_walls=True`). | `100`     |
-| `wall_avoidance_force`      | Strength of the repulsive wall-avoidance steering force (only when `observable_walls=True`). | `1.0`     |
+| `wall_avoidance_distance`   | Distance from walls at which avoidance steering activates (`observable_walls=True`).    | `100`         |
+| `wall_avoidance_force`      | Strength of the repulsive wall-avoidance force (only when `observable_walls=True`).     | `1.0`         |
 
 ## Topology
 
